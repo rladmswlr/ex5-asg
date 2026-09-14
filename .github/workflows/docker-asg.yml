@@ -50,16 +50,17 @@ jobs:
           
           
       # GitHub → S3 → Private EC2
-      # - name: 컨테이너 배포 및 S3 파일 싱크
-      #   run: |
-      #     aws ssm send-command \
-      #       --instance-ids "i-022eea274191f4ee7" \
-      #       --document-name "AWS-RunShellScript" \
-      #       --parameters 'commands=[
-      #         "sudo docker pull rladmswlr/nginx:1.31.3-cd",
-      #         "sudo docker stop nginx-container || true",
-      #         "sudo docker rm nginx-container || true",
-      #         "sudo docker run -d --name nginx-container -p 80:80 rladmswlr/nginx:1.31.3-cd"
-      #       ]' \
-      #       --region "${{ secrets.S3_REGION }}" \
-      #       --comment "Deploying SSM docker"
+      - name: 컨테이너 배포 및 S3 파일 싱크
+        run: |
+          aws ssm send-command \
+            --instance-ids "i-022eea274191f4ee7" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 925047940866.dkr.ecr.us-east-2.amazonaws.com",
+              "sudo docker pull 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest",
+              "sudo docker stop nginx-container || true",
+              "sudo docker rm nginx-container || true",
+              "sudo docker run -d --name nginx-container -p 80:80 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest"
+            ]' \
+            --region "${{ secrets.S3_REGION }}" \
+            --comment "Deploying SSM docker"

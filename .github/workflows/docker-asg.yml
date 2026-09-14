@@ -35,6 +35,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.S3_REGION }}
       
+      - name: S3 정적 웹사이트로 배포
+        run: |
+          # 전체 동기화
+          aws s3 cp ./docker-compose.yaml s3://std16-test-bucket/docker-compose.yaml
+
       # ECR에 Docker 이미지 빌드 및 푸시
       - name: Login to Amazon ECR
         id: login-ecr
@@ -57,10 +62,12 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 925047940866.dkr.ecr.us-east-2.amazonaws.com",
-              "sudo docker pull 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest",
               "sudo docker stop nginx-container || true",
               "sudo docker rm nginx-container || true",
-              "sudo docker run -d --name nginx-container -p 80:80 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest"
+              "sudo aws s3 cp s3://std16-test-bucket/docker-compose.yaml ./docker-compose.yaml",
+              "docker compose pull",
+              "docker compose up -d --remove-orphans",
+              "docker image prune -f"
             ]' \
             --region "${{ secrets.S3_REGION }}" \
             --comment "Deploying SSM docker"

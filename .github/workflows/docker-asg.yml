@@ -58,8 +58,8 @@ jobs:
       - name: 컨테이너 배포 및 S3 파일 싱크
         run: |
           aws ssm send-command \
-            --instance-ids "i-022eea274191f4ee7" \
             --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Cicd,Value=asg"
             --parameters 'commands=[
               "aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 925047940866.dkr.ecr.us-east-2.amazonaws.com",
               "sudo docker stop nginx-container || true",

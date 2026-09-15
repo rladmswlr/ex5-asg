@@ -5,6 +5,7 @@ on:
   push:
     branches: ["main"]
 
+#testtest1
 jobs:
   build-and-update:
     runs-on: ubuntu-latest
@@ -37,8 +38,12 @@ jobs:
       
       - name: S3 정적 웹사이트로 배포
         run: |
-          # 전체 동기화
-          aws s3 cp ./docker-compose.yaml s3://std16-test-bucket/docker-compose.yaml
+          aws s3 cp ./docker-compose.yaml \
+            s3://std16-test-bucket/docker-compose.yaml
+
+          aws s3 sync ./nginx/html \
+            s3://std16-test-bucket/html/ \
+            --delete
 
       # ECR에 Docker 이미지 빌드 및 푸시
       - name: Login to Amazon ECR
@@ -47,11 +52,21 @@ jobs:
 
       - name: Build and push Docker image to ECR
         run: |
-          docker build --no-cache -t 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:1.31.3-ecr ./nginx
-          docker build --no-cache -t 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest ./nginx
+          # nginx 이미지 빌드
+          docker build --no-cache \
+            -t 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:1.31.3-ecr \
+            -t 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest \
+            ./nginx
 
+          # FastAPI 이미지 빌드
+          docker build --no-cache \
+            -t 925047940866.dkr.ecr.us-east-2.amazonaws.com/fastapi:latest \
+            ./fastapi
+
+          # ECR Push
           docker push 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:1.31.3-ecr
           docker push 925047940866.dkr.ecr.us-east-2.amazonaws.com/nginx:latest
+          docker push 925047940866.dkr.ecr.us-east-2.amazonaws.com/fastapi:latest
           
           
       # GitHub → S3 → Private EC2
@@ -60,14 +75,17 @@ jobs:
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Cicd,Values=asg" \
-            --parameters 'commands=[
-              "aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 925047940866.dkr.ecr.us-east-2.amazonaws.com",
-              "sudo docker stop nginx-container || true",
-              "sudo docker rm nginx-container || true",
-              "sudo aws s3 cp s3://std16-test-bucket/docker-compose.yaml ./docker-compose.yaml",
-              "docker compose pull",
-              "docker compose up -d --remove-orphans",
-              "docker image prune -f"
-            ]' \
+            --parameters "commands=[
+              \"aws ecr get-login-password --region us-east-2 | sudo docker login --username AWS --password-stdin 925047940866.dkr.ecr.us-east-2.amazonaws.com\",
+              \"sudo docker stop nginx-container || true\",
+              \"sudo docker rm nginx-container || true\",
+              \"sudo mkdir -p /home/ec2-user/nginx/html\",
+              \"sudo chown -R ec2-user:ec2-user /home/ec2-user/nginx\",
+              \"sudo aws s3 sync s3://std16-test-bucket/html/ /home/ec2-user/nginx/html/ --delete\",
+              \"sudo aws s3 cp s3://std16-test-bucket/docker-compose.yaml /home/ec2-user/docker-compose.yaml\",
+              \"sudo docker compose -f /home/ec2-user/docker-compose.yaml pull\",
+              \"sudo docker compose -f /home/ec2-user/docker-compose.yaml up -d --remove-orphans\",
+              \"sudo docker image prune -f\"
+            ]" \
             --region "${{ secrets.S3_REGION }}" \
             --comment "Deploying SSM docker"

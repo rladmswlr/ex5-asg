@@ -9,10 +9,19 @@ services:
     #   - /home/ec2-user/nginx/html:/usr/share/nginx/html:ro
     #   - /home/ec2-user/nginx/logs:/var/log/nginx
     restart: always
+    depends_on:
+      - fastapi
     # networks:
     #   - public-subnet
     #     aliases:
     #       - nginx
+
+  fastapi:
+    image: 925047940866.dkr.ecr.us-east-2.amazonaws.com/fastapi:latest
+    container_name: fastapi-container
+    expose:
+      - "8000"
+    restart: always
 
 # networks:
 #   public-subnet:
